@@ -1,0 +1,4 @@
+.venv/
+dlx_python/dlx/__pycache__/
+__pycache__/
+.vscode

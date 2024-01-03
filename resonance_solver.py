@@ -13,6 +13,10 @@ from pprint import pprint
 from dlx_python import dlx
 from criteria_config import *
 
+type BitString = List[int]
+type Coord = Tuple[int, int] # (row, col)
+Placement = namedtuple('Placement', ['piece_index', 'rotation', 'coord'])
+
 GRID_SIZES = {
     1: (4,4),
     2: (4,4),
@@ -32,37 +36,37 @@ GRID_SIZES = {
 }
 
 PIECES_DIMENSIONS = {
-    'T' :[       # T
+    'T' :[ # T
         [0,1,0],
         [0,1,0],
         [1,1,1],
     ],
-    'U' :[       # U
+    'U' :[ # U
         [1,0,1],
         [1,1,1]
     ],
-    'Z' :[       # Z
+    'Z' :[ # Z
         [1,1,0],
         [0,1,0],
         [0,1,1]
     ],
-    'Plus' :[    # +
+    'Plus' :[ # +
         [0,1,0],
         [1,1,1],
         [0,1,0]
     ],
 
-    'L' :[        # L
+    'L' :[ # L
         [1,0],
         [1,0],
         [1,1],
     ],
-    'ReverseL' :[  # l
+    'ReverseL' :[ # l
         [0,1],
         [0,1],
         [1,1]
     ],
-    'S': [        # S
+    'S': [ # S
         [0,1,1],
         [1,1,0]
     ],
@@ -79,44 +83,46 @@ PIECES_DIMENSIONS = {
         [0,1,0],
         [1,1,1]
     ],
-    'Line': [  # |
+    'Line': [ # |
         [1,1,1,1]
     ],
     'Corner': [ # C
         [1,1],
         [0,1]
     ],
-
-    '2Piece': [  # 2
+    '2Piece': [ # 2
         [1,1]
     ],
-    'DotAtk': [  # A
+    'DotAtk': [ # A
         [1]
     ],
-    'DotDef': [  # D
+    'DotDef': [ # D
         [1]
     ]
 }
 
 class Shape:
-    def __init__(self, name, short_name, shape, num_unique_rots):
-        self.name = name
-        self.short_name = short_name
-        self.shape = shape
-        self.num_unique_rotations = num_unique_rots
-        self.size = np.sum(shape)
+    def __init__(self, name:str, short_name:str, shape:List[List[int]], num_unique_rots:int):
+        self.name: str = name
+        self.short_name: str = short_name
+        self.shape: Any = shape
+        self.num_unique_rotations: int = num_unique_rots
+        self.size: int = np.sum(shape)
 
         if num_unique_rots == 1:
-            self.rots = {0: self.shape}
+            self._rots = {0: self.shape}
         elif num_unique_rots == 2:
-            self.rots = {
+            self._rots = {
                 0: self.shape,
-                90: np.rot90(self.shape, 1)
+                90: np.rot90(self.shape, 1).tolist()
             }
         else:
-            self.rots = {}
+            self._rots = {}
             for i in range(num_unique_rots):
-                self.rots[i*90] = np.rot90(self.shape, i)
+                self._rots[i*90] = np.rot90(self.shape, i)
+
+    def rotation(self, rot_deg) -> List[List[int]]:
+        return self._rots[rot_deg]
 
     def __str__(self):
         return "Shape(" + str(self.shape) + ")"
@@ -244,30 +250,14 @@ class Stat:
         stat.dmg_taken_reduction = self.dmg_taken_reduction - other.dmg_taken_reduction
         return stat
 
-
-type StatsDatabase = Dict[str, Dict[int, Stat]]
-def readInStatsFromFile(filepath) -> StatsDatabase:
-    data = {}
-    with open(filepath, 'r', encoding='utf-8') as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            for k in row.keys():
-                if k == "Piece":
-                    continue
-                row[k] = row[k].strip("%")
-                if len(row[k]):
-                    row[k] = float(row[k])
-                else:
-                    row[k] = 0
-
-            if row['Piece'] not in data:
-                data[row['Piece']] = {}
-            data[row['Piece']][row['Piece Level']] = Stat(row)
-
-    return data
-
 class Piece:
-    def __init__(self, name, level, shape, rotation, stats: Stat):
+    def __init__(
+            self,
+            name: str,
+            level:int,
+            shape: Shape,
+            rotation: int,
+            stats: Stat):
         self.name : str = name
         self.level : int = level
         self._shape : Shape = shape
@@ -287,18 +277,18 @@ class Piece:
         ))
     
     @property
-    def short_name(self):
+    def short_name(self) -> str:
         return self._shape.short_name
     
     @property
-    def size(self):
+    def size(self) -> int:
         return self._shape.size
     
     @property
     def shape(self):
-        return self._shape.rots[self._rotation]
+        return self._shape.rotation(self._rotation)
     
-    def set_rotation(self, new_rot):
+    def set_rotation(self, new_rot: int):
         self._rotation = new_rot
         return self
     
@@ -311,7 +301,7 @@ class Piece:
         return len(self.shape)
     
     def get_rotations(self):
-        return [x for x in self._shape.rots.keys()]
+        return [x for x in self._shape._rots.keys()]
     
     def get_positions(self):
         for (ri, row) in enumerate(self.shape):
@@ -322,65 +312,12 @@ class Piece:
     def is_resonance_piece(self):
         return self.name in ('Z', 'T', 'U', 'Plus')
 
-    
-def readResonancePiecesPerType(filepath):
-    data = {}
-    with open(filepath, 'r', encoding='utf-8') as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            resonanceType = row['Resonance Type']
-            if resonanceType not in data:
-                data[resonanceType] = {}
-            resonanceLevel = int(row['Resonance Level'])
-            if row['Piece'] == 'ResonanceType':
-                row['Piece'] = resonanceType
-            
-            num_pieces = row['Number Pieces']
-            if num_pieces is None:
-                num_pieces = 0
-            if len(num_pieces) == 0:
-                num_pieces = 0
-            num_pieces = int(num_pieces)
-            if num_pieces == 0:
-                continue
-
-            pieceLevel = int(row['Piece Level'])
-            if resonanceLevel not in data[resonanceType]:
-                data[resonanceType][resonanceLevel] = []
-
-            data[resonanceType][resonanceLevel].append({
-                'piece': row['Piece'],
-                'piece_level': pieceLevel,
-                'num_pieces': num_pieces
-            })
-
-    return data
-
-def constructPieces(
-        resonancePiecesPerType,
-        piecesStatData: StatsDatabase,
-        resonanceLevel,
-        resonanceType
-    ) -> list[Piece]:
-    data = []
-
-    for piece in resonancePiecesPerType[resonanceType][resonanceLevel]:
-        num_pieces = piece['num_pieces']
-        for _ in range(num_pieces):
-            data.append(Piece(
-                piece['piece'], 
-                piece['piece_level'],
-                SHAPES[piece['piece']],
-                0,  # 0 degrees rotation (default orientation)
-                piecesStatData[piece['piece']][piece['piece_level']]
-            ))  
-    return data
-
 class Solution:
-    def __init__(self, solution, pieces):
-        self.solution = solution
-        self.pieces = pieces
-        self.stats = self.getStats()
+    def __init__(self, solution : BitString, pieces: List[Piece]):
+        self.solution: BitString = solution
+        self.pieces: List[Piece] = pieces
+        self.stats: Stat = self.getStats()
+        self._contains_resonance_piece: Optional[bool] = None
 
     def __str__(self):
         return str(self.stats)
@@ -388,10 +325,18 @@ class Solution:
     def __repr__(self):
         return str(self.stats)
     
-    def print(self):
+    def print(self) -> str:
         return "{}\n{}".format(self.to_shortname(), self.stats)
     
-    def to_shortname(self):
+    def to_shortname(self) -> str:
+        """
+        A shortname is just like the bit-string but instead of just 1 and 0's at each
+        index, instead we represent the bit string using the Pieces single character
+        name. 
+        For example:
+            [1,0,0,1] could be represented as 'Z _ _ O' 
+        This makes it more human readable.
+        """
         result = []
         for si,ok in enumerate(self.solution):
             if ok:
@@ -401,11 +346,27 @@ class Solution:
                 result.append('_')
         return " ".join(result)
     
-    def contains_resonance_piece(self):
-        return self.solution[0] == 1
+    def contains_resonance_piece(self) -> bool:
+        if self._contains_resonance_piece is None:
+            self._contains_resonance_piece = False
+            for si, ok in enumerate(self.solution):
+                if ok:
+                    piece = self.pieces[si]
+                    if piece.is_resonance_piece():
+                        self._contains_resonance_piece = True
+                        break
+        return self._contains_resonance_piece
+        # return self.solution[0] == 1
 
     @classmethod
     def to_solution(cls, chosen: List[str], pieces: List[Piece]):
+        """
+        Converts a list of short_names strings into a proper Solution object.
+        For example:
+        ['Z', 'L', 'L', 'l'] might turn into the bit string
+        [1, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0] into
+        Solution([1, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0], pieces)
+        """
         used = [False for _ in range(len(pieces))]
         solution = [0 for _ in range(len(pieces))]
         for piece_shortname in chosen:
@@ -422,7 +383,11 @@ class Solution:
                 return None
         return Solution(solution, pieces)
     
-    def getStats(self):
+    def getStats(self) -> Stat:
+        """
+        Iterates through every piece which is included in this solution and
+        sums up all their stats. Returns it as a Stat object
+        """
         stat = Stat(None)
         for pi,ok in enumerate(self.solution):
             if not ok:
@@ -431,29 +396,10 @@ class Solution:
             stat += piece.stats
         return stat
     
-    def iterate(self, fn):
-        total = None
-        for pi, ok in enumerate(self.solution):
-            if ok:
-                piece: Piece = self.pieces[pi]
-                val = fn(piece)
-                if total is None:
-                    if isinstance(val, tuple):
-                        total = list(val)
-                    else:
-                        total = val
-                else:
-                    if isinstance(val, tuple):
-                        for i,x in enumerate(val):
-                            total[i] += x
-                    else:
-                        total += fn(piece)
-        return total
-
 class Grid:
-    def __init__(self, grid_size):
-        self.grid_size = grid_size
-        self.grid = None
+    def __init__(self, grid_size: Tuple[int,int]):
+        self.grid_size = grid_size # (rows, cols)
+        self.grid: List[List[Optional[str]]] = []
         self.num_filled = 0
         self.num_inserts = 0
         self.reset()
@@ -461,12 +407,16 @@ class Grid:
     @classmethod
     def from_solution(self, 
                      grid_size: Tuple[int, int], 
-                     answer,
+                     answer: List[Placement],
                      pieces: List[Piece]):
+        # Given the answer from the DLX solver. attempt to 
+        # places all the pieces into the grid and then retun it
         grid = Grid(grid_size)
         for (piece_index, rotation, coord) in answer:
             piece = pieces[piece_index]
             piece = piece.set_rotation(rotation)
+            if not grid.will_fit(coord, piece):
+                raise Exception(f"Invalid placement {piece_index},{rotation},{coord}")
             grid.insert_piece(coord, piece)
         return grid
 
@@ -475,15 +425,16 @@ class Grid:
         self.num_filled = 0
         self.num_inserts = 0
 
-    def create_empty_grid(self, grid_size):
-        grid = []
-        for row in range(grid_size[0]):
+    def create_empty_grid(self, grid_size: Tuple[int,int]) -> List[List[Optional[str]]]:
+        grid: List[List[Optional[str]]] = []
+        num_rows, num_cols = grid_size[0], grid_size[1]
+        for row in range(num_rows):
             grid.append([])
-            for col in range(grid_size[1]):
+            for col in range(num_cols):
                 grid[row].append(None)
         return grid
     
-    def insert_piece(self, coord, piece):
+    def insert_piece(self, coord: Coord, piece: Piece):
         self.num_inserts += 1
         for (ri, row) in enumerate(piece.shape):
             for (ci, col) in enumerate(row):
@@ -494,7 +445,7 @@ class Grid:
                 self.grid[new_row][new_col] = piece.short_name
         self.num_filled += piece.size
 
-    def remove_piece(self, coord, piece):
+    def remove_piece(self, coord: Coord, piece: Piece):
         for (ri, row) in enumerate(piece.shape):
             for (ci, col) in enumerate(row):
                 new_row = coord[0] + ri
@@ -503,7 +454,7 @@ class Grid:
                     self.grid[new_row][new_col] = None
         self.num_filled -= piece.size
                 
-    def will_fit(self, coord, piece):
+    def will_fit(self, coord: Coord, piece: Piece) -> bool:
         # Check for conflicting squares
         for (ri, row) in enumerate(piece.shape):
             for (ci, col) in enumerate(row):
@@ -534,7 +485,7 @@ class Grid:
     def height(self):
         return self.grid_size[1]
     
-    def print_grid(self):
+    def print_grid(self) -> str:
         line = ""
         for row in self.grid:
             for col in row:
@@ -551,14 +502,105 @@ class Grid:
     def __repr__(self):
         return self.print_grid()
 
-def subset_sum(lower, upper, target, sizes, n):
+type StatsDatabase = Dict[str, Dict[int, Stat]]
+def readInStatsFromFile(filepath) -> StatsDatabase:
+    data: StatsDatabase = {}
+    with open(filepath, 'r', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            for k in row.keys():
+                if k == "Piece":
+                    continue
+                row[k] = row[k].strip("%")
+                if len(row[k]):
+                    row[k] = float(row[k])
+                else:
+                    row[k] = 0
+
+            if row['Piece'] not in data:
+                data[row['Piece']] = {}
+            piece_level = int(row['Piece Level'])
+            data[row['Piece']][piece_level] = Stat(row)
+
+    return data
+    
+type ResonancePiecesDatabase = Dict[str, Dict[int, List[Dict[str,Any]]]]
+def readResonancePiecesPerType(filepath) -> ResonancePiecesDatabase:
+    data:ResonancePiecesDatabase = {}
+    with open(filepath, 'r', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            resonanceType:str = row['Resonance Type']
+            if resonanceType not in data:
+                data[resonanceType] = {}
+            resonanceLevel = int(row['Resonance Level'])
+            if row['Piece'] == 'ResonanceType':
+                row['Piece'] = resonanceType
+            
+            num_pieces: Union[str,int] = row['Number Pieces']
+            if num_pieces is None:
+                num_pieces = 0
+            if not num_pieces:
+                num_pieces = 0
+            num_pieces = int(num_pieces)
+            if num_pieces == 0:
+                continue
+
+            pieceLevel:int = int(row['Piece Level'])
+            if resonanceLevel not in data[resonanceType]:
+                data[resonanceType][resonanceLevel] = []
+
+            data[resonanceType][resonanceLevel].append({
+                'piece': row['Piece'],
+                'piece_level': pieceLevel,
+                'num_pieces': num_pieces
+            })
+
+    return data
+
+def constructPieces(
+        resonancePiecesPerType: ResonancePiecesDatabase,
+        piecesStatData: StatsDatabase,
+        resonanceLevel: int,
+        resonanceType: str
+    ) -> list[Piece]:
+    """
+    Given the resonanceLevel and resonanceType we want to build a List of 
+    all the Pieces with their shape and Stats which should be included.
+    """
+    data = []
+
+    for piece in resonancePiecesPerType[resonanceType][resonanceLevel]:
+        num_pieces = piece['num_pieces']
+        for _ in range(num_pieces):
+            data.append(Piece(
+                piece['piece'], 
+                int(piece['piece_level']),
+                SHAPES[piece['piece']],
+                0,  # 0 degrees rotation (default orientation)
+                piecesStatData[piece['piece']][piece['piece_level']]
+            ))
+    return data
+
+def subset_sum(lower, upper, target, sizes, n) -> List[BitString]:
+    """
+    A method used to generate all possible bit-strings which sum 
+    up to the `target` value. The `sizes` array contains the value
+    at each index (i.e sizes[i] contains the summable value at index i).
+
+    Becuase our problem size is less than 32 bits, we just generate all
+    numbers between `lower` and `upper` and read-off the bit representation
+    to determine the bit-strings
+    """
     solutions = []
     for num in range(lower, upper+1):
         total = 0
 
-        solution = [0 for _ in range(n)]
+        solution : BitString = [0 for _ in range(n)]
         for i in range(n):
             if num & (1 << i) > 0:
+                # the lower-bits (i.e index 0,1,2) corresponds to the high-bits
+                # in the solution. It is just to make it easier for me to understand.
                 total += sizes[n-i-1]
                 solution[n-i-1] = 1
         
@@ -567,10 +609,19 @@ def subset_sum(lower, upper, target, sizes, n):
 
     return solutions
 
-def subset_sum_multithread(pieces, target, num_threads=14):
-    n = len(pieces)
+def subset_sum_multithread(sizes, target, num_threads=14):
+    """
+    A multithreaded appraoach to generate a list of all the bitstrings which 
+    sum up to the `target` value. The `sizes` array contains the value at each
+    index.
+
+    We multi-thread this, otherwise at large enough sizes (i.e len(sizes) == 26) it
+    takes my computer 2 minutes to compute all the subset-sums. Seeing as
+    we may need to calculate the subset multiple times at each resonance level
+    it was worth multithreading.
+    """
+    n = len(sizes)
     limit = int(math.pow(2, n))
-    sizes = [pieces[i].size for i in range(n)]
 
     portion = (limit / num_threads)
     bounds = []
@@ -591,21 +642,74 @@ def subset_sum_multithread(pieces, target, num_threads=14):
         solutions.extend(res.get())
     return solutions
 
-def get_resonance_solutions(grid_size, pieces):
+def get_resonance_solutions(grid_size: Tuple[int,int], pieces: List[Piece]):
     want = grid_size[0] * grid_size[1]
     start = time.time()
-    piece_subsets = subset_sum_multithread(pieces, want)
+    piece_subsets = subset_sum_multithread(
+        [pieces[i].size for i in range(len(pieces))],
+        want
+    )
     end = time.time()
     # print("Piece subsets:", end-start, "secs")
     return piece_subsets
 
-def order_resonance_solutions(
-        solutions: List[List[int]],
+def get_solution_candidates(
+        solutions: List[BitString],
         pieces: List[Piece],
-        criteria: Criteria
-    ):
-    solutions = [Solution(x, pieces) for x in solutions]
-    solutions: List[Solution] = [x for x in solutions if x.contains_resonance_piece()]
+        criteria: Criteria,
+        top_n=3
+    ) -> List[Solution]:
+    """
+    Given the list of solutions, perform some filtering and sorting so that 
+    we only return a small set of possible solutions which match the given
+    criteria.
+
+    Note, this does not return a strict ordered top-n list of solutions. Because
+    some solutions are very similar in the matched `Criteria` (i.e crit_rate). 
+    Taking a top-10 after a pure sort will exclude some other valid builds 
+    (i.e trade off 2% off crit rate but gain 8-10% in other relevant stats).
+    So instead we take the approach of returning the top_n of each Criteria.ordering
+    and then filter off solutions from those subsets. In this way we get some 
+    more varied solutions which are still competetive.
+
+    Ideally I think it would be better to define a function
+    f(x,y,z) = a*x + b*y + c*z
+    which can provide us a single value so that we can do a sorted ordering
+    and just tune the weights so that we return competetive results. 
+    It is hard to tune these weights though, so I went with this approach for now
+
+    Example:
+    If the criteria is [crit_rate, atk] we do some 'partitioning' to create
+    blocks of solutions like this:
+    {
+        # 32, and 30.5 are the top-2 `crit_rate` results
+        32.0: {
+            # 10, and 9.5 are the top-2 'atk' results
+            10: [...Solutions],
+            9.5: [...Solutions],
+        },
+        30.5: {
+            # Note how even though crit_rate for this set of solutions is lower 
+            # (30.5 compare to 32.5), the atk stat gains are more significant
+            # (15,16) compared to (10,9.5). Some users may find this trade-off
+            # acceptable for a solution to the resonance puzzle.
+            15: [...Solutions],
+            16: [...Solutions],
+        },
+    }
+    """
+
+
+    # Convert into Solution objects and then do some easy filtering
+    # 1. We always want a solution which contains the ResonanceType piece.
+    #    The stat gains are just too high to ignore. Although at very low resonance
+    #    levels if you _really_ want to eek out crit_rate, sometimes it is worth
+    #    excluding the resonance piece.
+    # 2. There are many solutions which end up with the same stat gains. Filter
+    #    out these solutions as it doesn't really matter which pieces we include
+    #    as long as we are at the given stat value.
+    converted_solutions: List[Solution] = [Solution(x, pieces) for x in solutions]
+    solutions_with_resonance: List[Solution] = [x for x in converted_solutions if x.contains_resonance_piece()]
     def filter_equal_stats(solutions):
         solutions2 = []
         seen = set()
@@ -615,14 +719,7 @@ def order_resonance_solutions(
             seen.add(solution.stats)
             solutions2.append(solution)
         return solutions2
-    solutions: List[Solution] = filter_equal_stats(solutions)
-    return solutions
-
-def get_solution_candidates(
-        solutions: List[Solution],
-        criteria: Criteria,
-        top_n=3
-    ):
+    filtered_solutions: List[Solution] = filter_equal_stats(solutions_with_resonance)
 
     def partition_into_blocks(solutions, get_stat_fn, top_n):
         blocks = defaultdict(list)
@@ -631,28 +728,28 @@ def get_solution_candidates(
             blocks[stat].append(solution)
         return {stat: blocks[stat] for stat in sorted(blocks, reverse=True)[:top_n]}
         
-    def continue_partition(blocks, solutions_fn, get_stat_fn, top_n):
+    def partition(blocks, solutions_fn, get_stat_fn, top_n):
         new_blocks = {}
         for stat, blks in blocks.items():
             if isinstance(blks, list):            
                 new_blocks[stat] = solutions_fn(blks, get_stat_fn, top_n)
             else:
-                new_blocks[stat] = continue_partition(blks, solutions_fn, get_stat_fn, top_n)
+                new_blocks[stat] = partition(blks, solutions_fn, get_stat_fn, top_n)
         return new_blocks
     
     def skim_solution(solutions, get_stat_fn, top_n=1):
         return sorted(solutions, key=get_stat_fn, reverse=True)[:top_n]
 
-    blocks = solutions
+    blocks = filtered_solutions
     for i,v in enumerate(criteria.get_ordering()):
         top_n, ordering_fn = v
         if i == 0:
             blocks = partition_into_blocks(blocks, ordering_fn, top_n)
         else:
-            blocks = continue_partition(
+            blocks = partition(
                 blocks, partition_into_blocks, ordering_fn, top_n
             )
-    blocks = continue_partition(
+    blocks = partition(
         blocks, 
         skim_solution,
         lambda x: x.stats.total_stat_gains(),
@@ -664,7 +761,7 @@ def get_solution_candidates(
     final_solutions = []
     def extract_solutions(solutions, fn, top_n):
         final_solutions.extend(solutions)
-    continue_partition(blocks, extract_solutions, lambda x: x, top_n)
+    partition(blocks, extract_solutions, lambda x: x, top_n)
     return final_solutions
 
 def print_pieces(pieces):
@@ -673,22 +770,20 @@ def print_pieces(pieces):
         pprint(piece)
 
 class Solver:
-    Answer = namedtuple('Answer', ['piece_index', 'rotation', 'coord'])
-    
-    def __init__(self, grid_size, pieces):
+    def __init__(self, grid_size: Tuple[int,int], pieces: List[Piece]):
         self.grid = Grid(grid_size)
         self.pieces = pieces
 
-    def _generateColumns(self, grid, pieces):
+    def _generateColumns(self, grid: Grid, pieces: List[Piece]):
         # each column represent the set elements
-        columns = []
+        columns: List[Tuple[Tuple, int]] = []
         # positions in the grid
         for ri in range(grid.height):
             for ci in range(grid.width):
                 columns.append((("coord", ri, ci), dlx.DLX.PRIMARY))
 
         # the pieces
-        pieces_index = {}
+        pieces_index: Dict[Tuple, int] = {}
         for pi, piece in enumerate(pieces):
             key = ("piece", pi, piece.short_name)
             value = len(columns)
@@ -697,12 +792,15 @@ class Solver:
 
         return (columns, pieces_index)
     
-    def _generateRows(self, pieces, pieces_index):
+    def _generateRows(
+            self, 
+            pieces: List[Piece],
+            pieces_index: Dict[Tuple, int]):
         # each row is a constraint
         # each constraint is a placement of a piece on the grid, accounting
         # for rotations and the shape of the block
         rows = []
-        row_names = []
+        row_names: List[Tuple[Tuple[str,int,str], int, Tuple[int,int]]] = []
         for pi,piece in enumerate(pieces):
             piece_key = ("piece", pi, piece.short_name)
             piece_column = pieces_index[piece_key]
@@ -726,16 +824,36 @@ class Solver:
                         row_names.append(row_name)
         return (rows, row_names)
     
-    def _convertSolutionIntoAnswer(self, solution, pieces_mapping, dlxObj):
-        answer = []
+    def _convertSolutionIntoAnswer(
+            self,
+            solution: List[int],
+            pieces_mapping: Dict[int,int],
+            dlxObj: dlx.DLX
+        ) -> List[Placement]:
+        """
+        Converts from dlx.DLX solution format (which is just a list of rowIds)
+        into a list of explicit Placement objects. Each placement contains 
+        information on the Piece, rotation and coordinate in which it should
+        be places in the grid/board to give a correct solution.
+        """
+        placements = []
         for rowId in solution:
+            # dlxObj.N contains the rowNames which we created in _generateRows
+            # The rownames are in the format lke this:
+            #   (('piece', 36, '+'), 90, (3,5))
+            # This tuple gives us the information on which piece
+            # the index into the pieces array, the short_name of the piece
+            # the rotation needed on the piece, and (row,col) coordinate
+            # on where to put the top-left corner of the shape in the grid
+            # in order to have it fit in the grid
             row_name = dlxObj.N[rowId]
+
             piece_index = row_name[0][1]
             piece_index = pieces_mapping[piece_index]
             rot = row_name[1]
             ri,ci = row_name[2]
-            answer.append(Solver.Answer(piece_index, rot, (ri,ci)))
-        return answer
+            placements.append(Placement(piece_index, rot, (ri,ci)))
+        return placements
     
     def _fill_grid(self, grid, answer, pieces):
         grid.reset()
@@ -745,12 +863,22 @@ class Solver:
             grid.insert_piece(coord, piece)
         return grid
 
-    def solve(self, chosenPieces):
+    def solve(self, chosenPieces: BitString) -> Optional[List[Placement]]:
+        """
+        Uses the dlx.DLX solver to solve the resonance puzzle.
+        The resonance puzzle can be reduced into a exact cover problem. For these
+        problems we can use Algorithm X with Dancing Links to solve it.
+        We convert the chosenPieces into the necessary columns and rows needed
+        by DLX. Then we solve() it and return the first solution.
+        We then convert from dlx.DLX's solution format into our own Answer format
+        which is just a list of Placements
+        """
+
         sub_pieces = []
         # maps the index of sub_pices into to its original index in self.pieces
         # this is so that the returned answer can relate the piecse chosen from 
         # the solution directly to the pieces
-        sub_pieces_mapping = {}  
+        sub_pieces_mapping: Dict[int,int] = {}  
         for i,ok in enumerate(chosenPieces):
             if ok:
                 sub_pieces.append(self.pieces[i])
@@ -765,21 +893,25 @@ class Solver:
         solution = None
         for x in dlxObj.solve():
             solution = x
+            # Just get the first solution, we don't need any other ones
             break
         end_time = time.time()
 
         if solution:
-            return self._convertSolutionIntoAnswer(solution, sub_pieces_mapping, dlxObj)
+            return self._convertSolutionIntoAnswer(
+                solution, sub_pieces_mapping, dlxObj)
         else:
             return None
 
 
 def main2():
-    resonancePiecesPerType = readResonancePiecesPerType('resonance_per_type.csv')
+    resonancePiecesPerType: ResonancePiecesDatabase = readResonancePiecesPerType('resonance_per_type.csv')
     piecesStatData: StatsDatabase = readInStatsFromFile('resonance_piece_values.csv')
 
     # Example resonance builds from the googlesheet
     # https://docs.google.com/spreadsheets/d/12NQ9kxcL4Iz4ZdNbsN7iZCBxtf2qNQ20i1YNcfo6QSc/htmlview
+    # Useful as a comparison on the performance of this shotgun approach compared
+    # to what is currently thought as best.
     fromDocs = {
         ('Z',5, DefBuild())   : ['2','s','D','D','t','Z','O','|'],
         ('U',5, DefBuild())   : ['U','2','s','D','D','s','t','O'],
@@ -805,30 +937,33 @@ def main2():
 
         print(resonanceType, resonanceLevel, criteria)
         dlxSolver = Solver(grid_size, pieces)
-        solutions: List[List[int]] = get_resonance_solutions(grid_size, pieces)
-        solutions: List[Solution] = order_resonance_solutions(solutions, pieces, criteria)
-        solutions: List[Solution] = get_solution_candidates(solutions, criteria, 2)
+        solutions_bitstrings: List[BitString] = get_resonance_solutions(grid_size, pieces)
+        solutions: List[Solution] = get_solution_candidates(
+            solutions_bitstrings, pieces, criteria, 2
+        )
 
-        answers: List[Solution] = []
+        answers: List[Tuple[Solution, List[Placement]]] = []
         for solution in solutions:    
-            answer = dlxSolver.solve(solution.solution)
+            answer: Optional[List[Placement]] = dlxSolver.solve(solution.solution)
             if answer is not None:
                 answers.append((solution, answer))
 
         for (i,(solution, answer)) in enumerate(answers):
             print(solution.print())
-            # print(Grid.from_solution(grid_size, answer, pieces))
+            print(Grid.from_solution(grid_size, answer, pieces))
+        print()
 
         desiredSolution: Solution = Solution.to_solution(fromDocs[key], pieces)
         answer = dlxSolver.solve(desiredSolution.solution)
-        print(desiredSolution.print())
-        print(Grid.from_solution(grid_size, answer, pieces))
+        if answer is not None:
+            print(desiredSolution.print())
+            print(Grid.from_solution(grid_size, answer, pieces))
 
 def main():
-    resonancePiecesPerType = readResonancePiecesPerType('resonance_per_type.csv')
+    resonancePiecesPerType: ResonancePiecesDatabase = readResonancePiecesPerType('resonance_per_type.csv')
     piecesStatData: StatsDatabase = readInStatsFromFile('resonance_piece_values.csv')
 
-    for resonanceLevel in range(2,3):   
+    for resonanceLevel in range(5,6):   
         grid_size = GRID_SIZES[resonanceLevel] 
         for resonanceType in ('Z', 'T', 'U', 'Plus'):
             pieces = constructPieces(
@@ -841,14 +976,15 @@ def main():
                 print(f"Level: {resonanceLevel}, Type: {resonanceType}, {criteria}")
 
                 dlxSolver = Solver(grid_size, pieces)
-                solutions: List[List[int]] = get_resonance_solutions(grid_size, pieces)
-                solutions: List[Solution] = order_resonance_solutions(solutions, pieces, criteria)
-                solutions: List[Solution] = get_solution_candidates(solutions, criteria, 2)
+                solutions_bitstrings: List[List[int]] = get_resonance_solutions(
+                    grid_size, pieces)
+                solutions: List[Solution] = get_solution_candidates(
+                    solutions_bitstrings, pieces, criteria, 2)
                 print("Number of candidates", len(solutions))
 
-                answers: List[Solution] = []
+                answers: List[Tuple[Solution, List[Placement]]] = []
                 for solution in solutions:    
-                    answer = dlxSolver.solve(solution.solution)
+                    answer: Optional[List[Placement]] = dlxSolver.solve(solution.solution)
                     if answer is not None:
                         answers.append((solution, answer))
 

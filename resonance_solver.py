@@ -13,8 +13,6 @@ from pprint import pprint
 from dlx_python import dlx
 from criteria_config import *
 
-type BitString = List[int]
-type Coord = Tuple[int, int] # (row, col)
 Placement = namedtuple('Placement', ['piece_index', 'rotation', 'coord'])
 
 GRID_SIZES = {
@@ -313,8 +311,8 @@ class Piece:
         return self.name in ('Z', 'T', 'U', 'Plus')
 
 class Solution:
-    def __init__(self, solution : BitString, pieces: List[Piece]):
-        self.solution: BitString = solution
+    def __init__(self, solution , pieces: List[Piece]):
+        self.solution = solution
         self.pieces: List[Piece] = pieces
         self.stats: Stat = self.getStats()
         self._contains_resonance_piece: Optional[bool] = None
@@ -356,6 +354,16 @@ class Solution:
                         self._contains_resonance_piece = True
                         break
         return self._contains_resonance_piece
+    
+    def contains_four_of_same_piece(self):
+        count = defaultdict(int)
+        for si, ok in enumerate(self.solution):
+            if ok:
+                piece = self.pieces[si]
+                count[piece.short_name] += 1
+                if count[piece.short_name] == 4:
+                    return True
+        return False
         # return self.solution[0] == 1
 
     @classmethod
@@ -434,7 +442,7 @@ class Grid:
                 grid[row].append(None)
         return grid
     
-    def insert_piece(self, coord: Coord, piece: Piece):
+    def insert_piece(self, coord , piece: Piece):
         self.num_inserts += 1
         for (ri, row) in enumerate(piece.shape):
             for (ci, col) in enumerate(row):
@@ -445,7 +453,7 @@ class Grid:
                 self.grid[new_row][new_col] = piece.short_name
         self.num_filled += piece.size
 
-    def remove_piece(self, coord: Coord, piece: Piece):
+    def remove_piece(self, coord , piece: Piece):
         for (ri, row) in enumerate(piece.shape):
             for (ci, col) in enumerate(row):
                 new_row = coord[0] + ri
@@ -454,7 +462,7 @@ class Grid:
                     self.grid[new_row][new_col] = None
         self.num_filled -= piece.size
                 
-    def will_fit(self, coord: Coord, piece: Piece) -> bool:
+    def will_fit(self, coord , piece: Piece) -> bool:
         # Check for conflicting squares
         for (ri, row) in enumerate(piece.shape):
             for (ci, col) in enumerate(row):
@@ -502,9 +510,8 @@ class Grid:
     def __repr__(self):
         return self.print_grid()
 
-type StatsDatabase = Dict[str, Dict[int, Stat]]
-def readInStatsFromFile(filepath) -> StatsDatabase:
-    data: StatsDatabase = {}
+def readInStatsFromFile(filepath):
+    data = {}
     with open(filepath, 'r', encoding='utf-8') as f:
         reader = csv.DictReader(f)
         for row in reader:
@@ -524,9 +531,8 @@ def readInStatsFromFile(filepath) -> StatsDatabase:
 
     return data
     
-type ResonancePiecesDatabase = Dict[str, Dict[int, List[Dict[str,Any]]]]
-def readResonancePiecesPerType(filepath) -> ResonancePiecesDatabase:
-    data:ResonancePiecesDatabase = {}
+def readResonancePiecesPerType(filepath):
+    data = {}
     with open(filepath, 'r', encoding='utf-8') as f:
         reader = csv.DictReader(f)
         for row in reader:
@@ -559,8 +565,8 @@ def readResonancePiecesPerType(filepath) -> ResonancePiecesDatabase:
     return data
 
 def constructPieces(
-        resonancePiecesPerType: ResonancePiecesDatabase,
-        piecesStatData: StatsDatabase,
+        resonancePiecesPerType,
+        piecesStatData,
         resonanceLevel: int,
         resonanceType: str
     ) -> list[Piece]:
@@ -582,7 +588,7 @@ def constructPieces(
             ))
     return data
 
-def subset_sum(lower, upper, target, sizes, n) -> List[BitString]:
+def subset_sum(lower, upper, target, sizes, n):
     """
     A method used to generate all possible bit-strings which sum 
     up to the `target` value. The `sizes` array contains the value
@@ -596,7 +602,7 @@ def subset_sum(lower, upper, target, sizes, n) -> List[BitString]:
     for num in range(lower, upper+1):
         total = 0
 
-        solution : BitString = [0 for _ in range(n)]
+        solution = [0 for _ in range(n)]
         for i in range(n):
             if num & (1 << i) > 0:
                 # the lower-bits (i.e index 0,1,2) corresponds to the high-bits
@@ -654,7 +660,7 @@ def get_resonance_solutions(grid_size: Tuple[int,int], pieces: List[Piece]):
     return piece_subsets
 
 def get_solution_candidates(
-        solutions: List[BitString],
+        solutions,
         pieces: List[Piece],
         criteria: Criteria,
         top_n=3
@@ -709,7 +715,8 @@ def get_solution_candidates(
     #    out these solutions as it doesn't really matter which pieces we include
     #    as long as we are at the given stat value.
     converted_solutions: List[Solution] = [Solution(x, pieces) for x in solutions]
-    solutions_with_resonance: List[Solution] = [x for x in converted_solutions if x.contains_resonance_piece()]
+    solutions_with_resonance2: List[Solution] = [x for x in converted_solutions if x.contains_resonance_piece()]
+    solutions_with_resonance: List[Solution] = [x for x in solutions_with_resonance2 if not x.contains_four_of_same_piece()]
     def filter_equal_stats(solutions):
         solutions2 = []
         seen = set()
@@ -863,7 +870,7 @@ class Solver:
             grid.insert_piece(coord, piece)
         return grid
 
-    def solve(self, chosenPieces: BitString) -> Optional[List[Placement]]:
+    def solve(self, chosenPieces) -> Optional[List[Placement]]:
         """
         Uses the dlx.DLX solver to solve the resonance puzzle.
         The resonance puzzle can be reduced into a exact cover problem. For these
@@ -905,8 +912,8 @@ class Solver:
 
 
 def main2():
-    resonancePiecesPerType: ResonancePiecesDatabase = readResonancePiecesPerType('resonance_per_type.csv')
-    piecesStatData: StatsDatabase = readInStatsFromFile('resonance_piece_values.csv')
+    resonancePiecesPerType = readResonancePiecesPerType('resonance_per_type.csv')
+    piecesStatData = readInStatsFromFile('resonance_piece_values.csv')
 
     # Example resonance builds from the googlesheet
     # https://docs.google.com/spreadsheets/d/12NQ9kxcL4Iz4ZdNbsN7iZCBxtf2qNQ20i1YNcfo6QSc/htmlview
@@ -937,7 +944,7 @@ def main2():
 
         print(resonanceType, resonanceLevel, criteria)
         dlxSolver = Solver(grid_size, pieces)
-        solutions_bitstrings: List[BitString] = get_resonance_solutions(grid_size, pieces)
+        solutions_bitstrings = get_resonance_solutions(grid_size, pieces)
         solutions: List[Solution] = get_solution_candidates(
             solutions_bitstrings, pieces, criteria, 2
         )
@@ -960,19 +967,19 @@ def main2():
             print(Grid.from_solution(grid_size, answer, pieces))
 
 def main():
-    resonancePiecesPerType: ResonancePiecesDatabase = readResonancePiecesPerType('resonance_per_type.csv')
-    piecesStatData: StatsDatabase = readInStatsFromFile('resonance_piece_values.csv')
+    resonancePiecesPerType = readResonancePiecesPerType('resonance_per_type.csv')
+    piecesStatData = readInStatsFromFile('resonance_piece_values.csv')
 
-    for resonanceLevel in range(5,6):   
+    for resonanceLevel in range(10,11):   
         grid_size = GRID_SIZES[resonanceLevel] 
-        for resonanceType in ('Z', 'T', 'U', 'Plus'):
+        for resonanceType in ('Z'):
             pieces = constructPieces(
                 resonancePiecesPerType,
                 piecesStatData,
                 resonanceLevel,
                 resonanceType
             )
-            for criteria in [AttackBuild(), CritBuild(), DefBuild()]:
+            for criteria in [DefBuild()]:
                 print(f"Level: {resonanceLevel}, Type: {resonanceType}, {criteria}")
 
                 dlxSolver = Solver(grid_size, pieces)

@@ -43,7 +43,7 @@ class AttackBuild(Criteria):
         self._name = 'Attack'
         self._ordering = [
             (3, lambda x: x.stats.atk + x.stats.dmg_bonus),
-            (3, lambda x: x.stats.reality_def + x.stats.mental_def + x.stats.dmg_taken_reduction),
+            (3, lambda x: x.stats.hp + x.stats.reality_def + x.stats.mental_def + x.stats.dmg_taken_reduction),
         ]
 
 class DefBuild(Criteria):
@@ -51,7 +51,7 @@ class DefBuild(Criteria):
         super().__init__()
         self._name = 'Def'
         self._ordering = [
-            (3, lambda x: x.stats.dmg_taken_reduction),
-            (3, lambda x: x.stats.hp + x.stats.reality_def + x.stats.mental_def),
+            (3, lambda x: x.stats.dmg_taken_reduction + x.stats.reality_def + x.stats.mental_def),
+            (3, lambda x: x.stats.hp ),
             (2, lambda x: x.stats.atk + x.stats.dmg_bonus)
         ]

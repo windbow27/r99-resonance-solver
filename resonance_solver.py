@@ -966,28 +966,32 @@ def main2():
             print(desiredSolution.print())
             print(Grid.from_solution(grid_size, answer, pieces))
 
-def main():
+def main(resonanceLevel, resonanceType, criteria):
     resonancePiecesPerType = readResonancePiecesPerType('resonance_per_type.csv')
     piecesStatData = readInStatsFromFile('resonance_piece_values.csv')
 
-    for resonanceLevel in range(10,11):   
-        grid_size = GRID_SIZES[resonanceLevel] 
-        for resonanceType in ('Z'):
+    results = []
+
+    for level in range(resonanceLevel, resonanceLevel + 1):   
+        grid_size = GRID_SIZES[level] 
+        for resonanceType in (resonanceType,):
             pieces = constructPieces(
                 resonancePiecesPerType,
                 piecesStatData,
-                resonanceLevel,
+                level,
                 resonanceType
             )
-            for criteria in [DefBuild()]:
-                print(f"Level: {resonanceLevel}, Type: {resonanceType}, {criteria}")
+            for criteria in [criteria]:
+                result = f"Level: {level}, Type: {resonanceType}, {criteria}\n"
+                results.append(result)
 
                 dlxSolver = Solver(grid_size, pieces)
                 solutions_bitstrings: List[List[int]] = get_resonance_solutions(
                     grid_size, pieces)
                 solutions: List[Solution] = get_solution_candidates(
                     solutions_bitstrings, pieces, criteria, 2)
-                print("Number of candidates", len(solutions))
+                result = f"Number of candidates {len(solutions)}\n"
+                results.append(result)
 
                 answers: List[Tuple[Solution, List[Placement]]] = []
                 for solution in solutions:    
@@ -995,12 +999,17 @@ def main():
                     if answer is not None:
                         answers.append((solution, answer))
 
-                for (i,(solution, answer)) in enumerate(answers):
-                    solution.stats.print_header()
-                    print(solution.print())
-                    print(Grid.from_solution(grid_size, answer, pieces))
+                for (i, (solution, answer)) in enumerate(answers):
+                    stats_line = "hp, atk, reality_def, mental_def, crit_rate, crit_dmg, crit_rate_def, crit_dmg_def, dmg_bonus, dmg_reduction"
+                    results.append(stats_line)
+                    solution_str = solution.print()
+                    results.append(solution_str)
+                    grid_str = str(Grid.from_solution(grid_size, answer, pieces))
+                    results.append(grid_str)
 
                 dlxSolver = Solver(grid_size, pieces)
+
+    return results
 
 if __name__ == "__main__":
     main()

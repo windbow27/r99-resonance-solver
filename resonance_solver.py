@@ -171,8 +171,8 @@ class Stat:
             self.dmg_bonus = row['dmg_bonus']
             self.dmg_taken_reduction = row['dmg_taken_reduction']
 
-    def print_header(self):
-        print("hp, atk, reality_def, mental_def, crit_rate, crit_dmg, crit_rate_def, crit_dmg_def, dmg_bonus, dmg_reduction")
+    # def print_header(self):
+    #     print("hp, atk, reality_def, mental_def, crit_rate, crit_dmg, crit_rate_def, crit_dmg_def, dmg_bonus, dmg_reduction")
 
     def __hash__(self):
         return hash((
@@ -187,17 +187,17 @@ class Stat:
 
     def __str__(self):
         return str([
-            self.hp, self.atk, self.reality_def, self.mental_def, "|",
-            self.crit_rate, self.crit_dmg, self.crit_rate_def, self.crit_dmg_def, "|",
-            self.dmg_bonus, self.dmg_taken_reduction, "|",
+            self.hp, self.atk, self.reality_def, self.mental_def,
+            self.crit_rate, self.crit_dmg, self.crit_rate_def, self.crit_dmg_def,
+            self.dmg_bonus, self.dmg_taken_reduction,
             int(self.total_stat_gains())
         ])
     
     def __repr__(self):
         return str([
-            self.hp, self.atk, self.reality_def, self.mental_def, "|",
-            self.crit_rate, self.crit_dmg, self.crit_rate_def, self.crit_dmg_def, "|",
-            self.dmg_bonus, self.dmg_taken_reduction, "|",
+            self.hp, self.atk, self.reality_def, self.mental_def,
+            self.crit_rate, self.crit_dmg, self.crit_rate_def, self.crit_dmg_def,
+            self.dmg_bonus, self.dmg_taken_reduction,
             int(self.total_stat_gains())
         ])
     
@@ -965,12 +965,17 @@ def main2():
         if answer is not None:
             print(desiredSolution.print())
             print(Grid.from_solution(grid_size, answer, pieces))
-
+            
 def main(resonanceLevel, resonanceType, criteria):
     resonancePiecesPerType = readResonancePiecesPerType('resonance_per_type.csv')
     piecesStatData = readInStatsFromFile('resonance_piece_values.csv')
 
     results = []
+
+    labels = [
+        "hp", "atk", "reality_def", "mental_def", "crit_rate", "crit_dmg",
+        "crit_rate_def", "crit_dmg_def", "dmg_bonus", "dmg_reduction"
+    ]
 
     for level in range(resonanceLevel, resonanceLevel + 1):   
         grid_size = GRID_SIZES[level] 
@@ -1000,16 +1005,25 @@ def main(resonanceLevel, resonanceType, criteria):
                         answers.append((solution, answer))
 
                 for (i, (solution, answer)) in enumerate(answers):
-                    stats_line = "hp, atk, reality_def, mental_def, crit_rate, crit_dmg, crit_rate_def, crit_dmg_def, dmg_bonus, dmg_reduction"
-                    results.append(stats_line)
-                    solution_str = solution.print()
+                    results.append('-----------------------------------\n')
+                    results.append(f"Solution #{i+1}\n")
+                    solution_values_str = str(solution).replace('[', '').replace(']', '').split('|')[0].split(',')
+                    solution_values = []
+                    for val in solution_values_str:
+                        cleaned_val = val.strip().replace("'", "")
+                        if cleaned_val: 
+                            try:
+                                solution_values.append(float(cleaned_val))
+                            except ValueError:
+                                continue 
+
+                    solution_dict = {label: value for label, value in zip(labels, solution_values)}
+                    solution_str = '\n'.join([f"{key}: {value}" for key, value in solution_dict.items()]) + '\n'
                     results.append(solution_str)
                     grid_str = str(Grid.from_solution(grid_size, answer, pieces))
                     results.append(grid_str)
-
-                dlxSolver = Solver(grid_size, pieces)
-
-    return results
+            dlxSolver = Solver(grid_size, pieces)
+            return results
 
 if __name__ == "__main__":
     main()

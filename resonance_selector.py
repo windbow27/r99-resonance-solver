@@ -34,7 +34,7 @@ def create_ui():
 
     # Dropdowns for resonance level, resonance type, and criteria
     tk.Label(root, text="Resonance Level:").grid(row=0, column=0, padx=10, pady=10)
-    resonance_level_var = tk.IntVar(value=10)
+    resonance_level_var = tk.IntVar(value=2)
     resonance_level_menu = ttk.Combobox(root, textvariable=resonance_level_var, values=list(range(2, 16)))
     resonance_level_menu.grid(row=0, column=1, padx=10, pady=10)
 

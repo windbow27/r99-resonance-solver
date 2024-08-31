@@ -12,29 +12,13 @@ python -m venv .venv
 pip install -r requirements.txt
 
 # Note this can take several minutes to complete
-python resonance_solver.py
+python resonance_selector.py
+
+# Open visualization.html with Live Server for one goofy visual demonstration page
 ```
 
 The output:
-```
-hp, atk, reality_def, mental_def, crit_rate, crit_dmg, crit_rate_def, crit_dmg_def, dmg_bonus, dmg_reduction
-Z _ L L _ _ S S _ O O t t | | _ _ C _ _ _ _ _ D
-[27.58, 31.47, 26.48, 26.55, '|', 14.5, 6.0, 14.0, 0, '|', 13.0, 9.5, '|', 169]
-Z Z L L O O |
-L Z D L O O |
-L Z Z L S S |
-L L t S S S |
-t t t O O S S
-t t t O O C S
-t | | | | C C
-
-...
-```
-
-The `Z _ L L _ ...` tells you which pieces were selected for this solution. The `_` are pieces which were not included. \
-The `[27.58, 31.47, 26.48, ...]` tells you the stats gained from this particular solution. It is a sum of all the stats from all the pieces of the solution. The `hp, atk, reality_def,...` header on the first line tells you which column corresponds to which stat. \
-Finally the printed 7x7 grid of letters is the specific placements of each piece in the grid.
-
+<p align="center"> <img src="https://i.imgur.com/9lfYf56.png"/ width="1280;"> </p>
 
 # How It Works
 The general program flow is this: 

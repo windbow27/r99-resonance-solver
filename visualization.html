@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Visualization</title>
+    <style>
+      .container {
+        margin: 50px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="main-container"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/konva/8.3.6/konva.min.js"></script>
+    <script>
+      fetch("grid_data.json")
+        .then((response) => response.json())
+        .then((grids) => {
+          var mainContainer = document.getElementById("main-container");
+
+          grids.forEach((grid, index) => {
+            var heading = document.createElement("h2");
+            heading.textContent = "Solution #" + (index + 1);
+            mainContainer.appendChild(heading);
+
+            var container = document.createElement("div");
+            container.className = "container";
+            mainContainer.appendChild(container);
+
+            var stage = new Konva.Stage({
+              container: container,
+              width: grid[0].length * 50,
+              height: grid.length * 50,
+            });
+
+            var layer = new Konva.Layer();
+            stage.add(layer);
+
+            var colors = {
+              T: "#FF6347", // Tomato
+              U: "#FF4500", // OrangeRed
+              Z: "#DC143C", // Crimson
+              "+": "#FF0000", // Red
+              L: "#1E90FF", // DodgerBlue
+              l: "#FFD700", // Gold
+              S: "#32CD32", // LimeGreen
+              s: "#800080", // Purple
+              O: "#FFA500", // Orange
+              t: "#8B4513", // SaddleBrown
+              "|": "#FF69B4", // HotPink
+              C: "#00FFFF", // Aqua
+              2: "#FF00FF", // Magenta
+              A: "#00FA9A", // MediumSpringGreen
+              D: "#7FFF00", // Chartreuse
+            };
+
+            var cellSize = 50;
+
+            for (var y = 0; y < grid.length; y++) {
+              for (var x = 0; x < grid[y].length; x++) {
+                var color = colors[grid[y][x]] || "white";
+                var rect = new Konva.Rect({
+                  x: x * cellSize,
+                  y: y * cellSize,
+                  width: cellSize,
+                  height: cellSize,
+                  fill: color,
+                  stroke: "black",
+                  strokeWidth: 2,
+                });
+                layer.add(rect);
+              }
+            }
+
+            layer.draw();
+          });
+        });
+    </script>
+  </body>
+</html>

@@ -2,9 +2,8 @@ import csv
 import numpy as np
 import math
 import time
-import functools
+import json
 import multiprocessing as mp
-
 from typing import *
 from collections import namedtuple
 from collections import defaultdict
@@ -326,6 +325,9 @@ class Solution:
     def print(self) -> str:
         return "{}\n{}".format(self.to_shortname(), self.stats)
     
+    def printShortname(self) -> str:
+        return self.to_shortname()
+    
     def to_shortname(self) -> str:
         """
         A shortname is just like the bit-string but instead of just 1 and 0's at each
@@ -340,8 +342,8 @@ class Solution:
             if ok:
                 piece = self.pieces[si]
                 result.append(piece.short_name)
-            else:
-                result.append('_')
+            # else:
+                # result.append('')
         return " ".join(result)
     
     def contains_resonance_piece(self) -> bool:
@@ -484,6 +486,12 @@ class Grid:
     
     def slots_left(self):
         return self.grid_size[0]*self.grid_size[1] - self.num_filled
+    
+    def to_list(self):
+        grid_list = []
+        for row in self.grid: 
+            grid_list.append([cell for cell in row])
+        return grid_list
 
     @property
     def width(self):
@@ -971,6 +979,8 @@ def main(resonanceLevel, resonanceType, criteria):
     piecesStatData = readInStatsFromFile('resonance_piece_values.csv')
 
     results = []
+    
+    all_grid_data = []
 
     labels = [
         "hp", "atk", "reality_def", "mental_def", "crit_rate", "crit_dmg",
@@ -1020,10 +1030,16 @@ def main(resonanceLevel, resonanceType, criteria):
                     solution_dict = {label: value for label, value in zip(labels, solution_values)}
                     solution_str = '\n'.join([f"{key}: {value}" for key, value in solution_dict.items()]) + '\n'
                     results.append(solution_str)
+                    results.append("Pieces used: " + solution.printShortname() + '\n')
                     grid_str = str(Grid.from_solution(grid_size, answer, pieces))
                     results.append(grid_str)
+                    grid_data = Grid.from_solution(grid_size, answer, pieces).to_list()
+                    all_grid_data.append(grid_data)
+                    
+            with open('grid_data.json', 'w') as f:
+                        json.dump(all_grid_data, f, indent=4, ensure_ascii=False)
             dlxSolver = Solver(grid_size, pieces)
             return results
-
+        
 if __name__ == "__main__":
     main()
